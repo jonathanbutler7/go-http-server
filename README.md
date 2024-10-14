@@ -10,6 +10,8 @@ s.shoppingItems = append(s.shoppingItems[:i], s.shoppingItems[i+1:]...)
 
 i asked chat gpt to summarize it in detail, and this is what it came up with: 
 
+# Chat GPT description of slices and `append`
+
 Let's dive deeper into the line that actually removes an item from the slice:
 
 ```go
