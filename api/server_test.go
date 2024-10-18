@@ -57,3 +57,5 @@ func TestGetItemsHandler(t *testing.T) {
 	})
 
 }
+
+// this server_test file is based on an article from twilio: https://www.twilio.com/en-us/blog/how-to-test-go-http-handlers
