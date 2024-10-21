@@ -33,7 +33,7 @@ func NewServer() *Server {
 	}
 
 	s.HandleFunc("/shopping-items", s.ListShoppingItems).Methods("GET")
-	s.HandleFunc("/shopping-items", s.createShoppingItems).Methods(("POST"))
+	s.HandleFunc("/shopping-items", s.CreateShoppingItem).Methods(("POST"))
 	s.HandleFunc("/shopping-items/{id}", s.removeShoppingItem).Methods("DELETE")
 	s.HandleFunc("/shopping-items/{id}", s.updateShoppingItem).Methods("PUT")
 
@@ -112,7 +112,7 @@ func (s *Server) removeShoppingItem(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent) // 204 no content is what I expect to see on DELETE requests ("I did something but there's nothing to return")
 }
 
-func (s *Server) createShoppingItems(w http.ResponseWriter, r *http.Request) {
+func (s *Server) CreateShoppingItem(w http.ResponseWriter, r *http.Request) {
 	var i Item
 	// we tend to exclusively use json.Unmarshal over json.NewDecoder.Decode, but I not positive as to why :)
 	// probably because it allows more finite error handling and it is more explicit of what is happening.
