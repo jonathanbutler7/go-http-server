@@ -142,7 +142,6 @@ func (s *Server) CreateShoppingItem(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-
 func (s *Server) ListShoppingItems(w http.ResponseWriter, _ *http.Request) {
 	// if you don't use an argument, it is good form for readability to "ignore" it by replacing the
 	// parameter variable name with an underscore like I did with the request parameter
@@ -154,6 +153,8 @@ func (s *Server) ListShoppingItems(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, fmt.Sprintf("error marshalling item\n\tError: %v\n", err), http.StatusInternalServerError)
 		return
 	}
+	// logic in this function to actually get data from the db
+	// getDataFromDB
 
 	_, err = w.Write(response)
 	if err != nil {

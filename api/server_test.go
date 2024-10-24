@@ -1,16 +1,15 @@
 package api_test
 
 import (
-	// "bytes"
+	"bytes"
 	"encoding/json"
 	"errors"
+	"example.com/m/api"
+	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"example.com/m/api"
-	"github.com/google/uuid"
 )
 
 type MockItemsDB struct {
@@ -20,8 +19,7 @@ type MockItemsDB struct {
 
 type ItemsDB interface {
 	ListShoppingItems() ([]*api.Item, error)
-	// CreateShoppingItem() (*api.Item, error)
-	// CreateShoppingItem(item *api.Item) error
+	CreateShoppingItem(item *api.Item) (*api.Item, error)
 }
 
 func (m *MockItemsDB) ListShoppingItems() ([]*api.Item, error) {
@@ -36,6 +34,16 @@ func (m *MockItemsDB) ListShoppingItems() ([]*api.Item, error) {
 	return m.shoppingItems, nil
 }
 
+func (m *MockItemsDB) CreateShoppingItem(item *api.Item) (*api.Item, error) {
+	if m.Err != nil {
+		return nil, m.Err
+	}
+
+	item.ID = uuid.New()
+	m.shoppingItems = append(m.shoppingItems, item)
+	return item, nil
+}
+
 func GetItemsHandler(db ItemsDB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		item, err := db.ListShoppingItems()
@@ -46,79 +54,83 @@ func GetItemsHandler(db ItemsDB) http.HandlerFunc {
 	}
 }
 
-// CreateItemHandler calls the CreateShoppingItem function
-// func CreateItemHandler(db ItemsDB) http.HandlerFunc {
-// 	return func(w http.ResponseWriter, r *http.Request) {
-// 		var newItem api.Item
-// 		if err := json.NewDecoder(r.Body).Decode(&newItem); err != nil {
-// 			http.Error(w, "invalid request payload", http.StatusBadRequest)
-// 			return
-// 		}
-// 		newItem.ID = uuid.New()
+func CreateItemHandler(db ItemsDB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var newItem api.Item
+		if err := json.NewDecoder(r.Body).Decode(&newItem); err != nil {
+			http.Error(w, "invalid request payload", http.StatusBadRequest)
+			return
+		}
+		item, err := db.CreateShoppingItem(&newItem)
 
-// 		if err := db.CreateShoppingItem(&newItem); err != nil {
-// 			http.Error(w, "failed to create shopping item", http.StatusInternalServerError)
-// 			return
-// 		}
+		if err != nil {
+			http.Error(w, "failed to create shopping item", http.StatusInternalServerError)
+			return
+		}
 
-// 		w.WriteHeader(http.StatusCreated)
-// 		json.NewEncoder(w).Encode(newItem)
-// 	}
-// }
+		w.WriteHeader(http.StatusCreated)
 
-// func TestCreateItemHandler(t *testing.T) {
-// 	t.Run("successful creation of a shopping item", func(t *testing.T) {
-// 		mockDB := &MockItemsDB{}
-// 		handler := CreateItemHandler(mockDB)
+		json.NewEncoder(w).Encode(item)
+	}
+}
 
-// 		newItem := api.Item{Name: "Almond butter"}
-// 		itemJSON, _ := json.Marshal(newItem)
+func TestCreateItemHandler(t *testing.T) {
+	t.Run("successful creation of a shopping item", func(t *testing.T) {
+		items := make([]*api.Item, 1)
+		items[0] = &api.Item{ID: uuid.New(), Name: "Peanut butter"}
+		mockDB := &MockItemsDB{
+			shoppingItems: items,
+		}
+		handler := CreateItemHandler(mockDB)
 
-// 		req, _ := http.NewRequest("POST", "/shopping-items", bytes.NewBuffer(itemJSON))
-// 		rr := httptest.NewRecorder()
-// 		handler.ServeHTTP(rr, req)
+		newItem := api.Item{Name: "Almond butter"}
+		itemJSON, _ := json.Marshal(newItem)
 
-// 		if status := rr.Code; status != http.StatusCreated {
-// 			t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusCreated)
-// 		}
+		req, _ := http.NewRequest("POST", "/shopping-items", bytes.NewBuffer(itemJSON))
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, req)
 
-// 		// Read the response body
-// 		bodyBytes, err := io.ReadAll(rr.Body)
-// 		if err != nil {
-// 			t.Fatalf("failed to read response body: %v", err)
-// 		}
+		if status := rr.Code; status != http.StatusCreated {
+			t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusCreated)
+		}
 
-// 		// Unmarshal the response into returnedItem
-// 		var returnedItem api.Item
-// 		if err := json.Unmarshal(bodyBytes, &returnedItem); err != nil {
-// 			t.Fatalf("failed to unmarshal response body: %v", err)
-// 		}
+		// Read the response body
+		bodyBytes, err := io.ReadAll(rr.Body)
+		if err != nil {
+			t.Fatalf("failed to read response body: %v", err)
+		}
 
-// 		// Validate the returned item
-// 		if returnedItem.Name != newItem.Name {
-// 			t.Errorf("handler returned unexpected item name: got %v want %v", returnedItem.Name, newItem.Name)
-// 		}
+		// Unmarshal the response into returnedItem
+		var returnedItem api.Item
+		if err := json.Unmarshal(bodyBytes, &returnedItem); err != nil {
+			t.Fatalf("failed to unmarshal response body: %v", err)
+		}
 
-// 		// Check if the item was added to the mock database
-// 		if len(mockDB.shoppingItems) != 1 || mockDB.shoppingItems[0].Name != newItem.Name {
-// 			t.Errorf("item was not added to the mock database")
-// 		}
-// 	})
+		// Validate the returned item
+		if returnedItem.Name != newItem.Name {
+			t.Errorf("handler returned unexpected item name: got %v want %v", returnedItem.Name, newItem.Name)
+		}
 
-// 	t.Run("failure due to bad request payload", func(t *testing.T) {
-// 		mockDB := &MockItemsDB{}
-// 		handler := CreateItemHandler(mockDB)
+		// Check if the item was added to the mock database
+		if len(mockDB.shoppingItems) != 2 || mockDB.shoppingItems[len(mockDB.shoppingItems)-1].Name != newItem.Name {
+			t.Errorf("item was not added to the mock database")
+		}
+	})
 
-// 		// Invalid JSON
-// 		req, _ := http.NewRequest("POST", "/shopping-items", bytes.NewBuffer([]byte("{invalid-json")))
-// 		rr := httptest.NewRecorder()
-// 		handler.ServeHTTP(rr, req)
+	t.Run("failure due to bad request payload", func(t *testing.T) {
+		mockDB := &MockItemsDB{}
+		handler := CreateItemHandler(mockDB)
 
-// 		if status := rr.Code; status != http.StatusBadRequest {
-// 			t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
-// 		}
-// 	})
-// }
+		// Invalid JSON
+		req, _ := http.NewRequest("POST", "/shopping-items", bytes.NewBuffer([]byte("{invalid-json")))
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, req)
+
+		if status := rr.Code; status != http.StatusBadRequest {
+			t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
+		}
+	})
+}
 
 func TestGetItemsHandler(t *testing.T) {
 	t.Run("successful retrieval of shopping items list", func(t *testing.T) {
